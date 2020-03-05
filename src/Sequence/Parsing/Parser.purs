@@ -1,8 +1,6 @@
-module Text.Parsing.Parser
-  ( ParseError(..)
-  , parseErrorMessage
-  , parseErrorPosition
-  , ParseState(..)
+module Sequence.Parsing.Parser
+  ( ParseState(..)
+  , parseStateRest 
   , ParserT(..)
   , Parser
   , runParser
@@ -26,113 +24,116 @@ import Control.Monad.Rec.Class (class MonadRec)
 import Control.Monad.State (class MonadState, StateT(..), evalStateT, gets, mapStateT, modify_, runStateT)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Control.MonadPlus (class Alternative, class MonadZero, class MonadPlus, class Plus)
+import Data.Default (def)
 import Data.Either (Either(..))
-import Data.Identity (Identity)
-import Data.Newtype (class Newtype, unwrap, over)
+import Data.Identity (Identity(..))
+import Data.Newtype (class Newtype, over, un)
 import Data.Tuple (Tuple(..))
-import Text.Parsing.Parser.Pos (Position, initialPos)
+import Sequence.Parsing.Parser.Class (class Parsable, rep)
+import Sequence.Parsing.Parser.ParseError (ParseError(..))
+import Utils.Data.Newtype (through)
 
--- | A parsing error, consisting of a message and position information.
-data ParseError = ParseError String Position
-
-parseErrorMessage :: ParseError -> String
-parseErrorMessage (ParseError msg _) = msg
-
-parseErrorPosition :: ParseError -> Position
-parseErrorPosition (ParseError _ pos) = pos
-
-instance showParseError :: Show ParseError where
-  show (ParseError msg pos) =
-    "(ParseError " <> show msg <> " " <> show pos <> ")"
-
-derive instance eqParseError :: Eq ParseError
-derive instance ordParseError :: Ord ParseError
 
 -- | Contains the remaining input and current position.
-data ParseState s = ParseState s Position Boolean
+newtype ParseState rep pos = ParseState {
+                               rest :: rep,
+                               pos :: pos,
+                               consumed :: Boolean }
+
+derive instance parseStateNewtype :: Newtype (ParseState rep pos) _
+
+parseStateRest :: forall rep pos. ParseState rep pos -> rep
+parseStateRest = through ParseState _.rest
 
 -- | The Parser monad transformer.
 -- |
 -- | The first type argument is the stream type. Typically, this is either `String`,
 -- | or some sort of token stream.
-newtype ParserT s m a = ParserT (ExceptT ParseError (StateT (ParseState s) m) a)
+newtype ParserT rep pos m a = ParserT (ExceptT (ParseError pos) (StateT (ParseState rep pos) m) a)
 
-derive instance newtypeParserT :: Newtype (ParserT s m a) _
-
--- | Apply a parser, keeping only the parsed result.
-runParserT :: forall m s a. Monad m => s -> ParserT s m a -> m (Either ParseError a)
-runParserT s p = evalStateT (runExceptT (unwrap p)) initialState where
-  initialState = ParseState s initialPos false
-
--- | The `Parser` monad is a synonym for the parser monad transformer applied to the `Identity` monad.
-type Parser s = ParserT s Identity
+derive instance newtypeParserT :: Newtype (ParserT rep pos m a) _
 
 -- | Apply a parser, keeping only the parsed result.
-runParser :: forall s a. s -> Parser s a -> Either ParseError a
-runParser s = unwrap <<< runParserT s
+runParserT :: forall seq elem rep pos m a.
+              Parsable seq elem rep pos => Monad m =>
+              seq -> ParserT rep pos m a -> m (Either (ParseError pos) a)
+runParserT s p = evalStateT (runExceptT (un ParserT p)) $ ParseState { rest: rep s, pos: def, consumed: false }
 
-hoistParserT :: forall s m n a. (m ~> n) -> ParserT s m a -> ParserT s n a
+
+-- | The `Parser` monad is a synonym for the ParserT monad transformer applied to the `Identity` monad.
+type Parser rep pos = ParserT rep pos Identity
+
+-- | Apply a parser, keeping only the parsed result.
+runParser :: forall seq elem rep pos a. Parsable seq elem rep pos =>
+             seq -> Parser rep pos a -> Either (ParseError pos) a
+runParser s = un Identity <<< runParserT s
+
+hoistParserT :: forall seq elem rep pos m n a.
+                Parsable seq elem rep pos =>
+                (m ~> n) -> ParserT rep pos m a -> ParserT rep pos n a
 hoistParserT = mapParserT
 
 -- | Change the underlying monad action and data type in a ParserT monad action.
-mapParserT :: forall b n s a m.
-  (  m (Tuple (Either ParseError a) (ParseState s))
-  -> n (Tuple (Either ParseError b) (ParseState s))
-  ) -> ParserT s m a -> ParserT s n b
+mapParserT :: forall seq elem rep pos m a n b.
+              Parsable seq elem rep pos =>
+              ( m (Tuple (Either (ParseError pos) a) (ParseState rep pos)) ->
+                n (Tuple (Either (ParseError pos) b) (ParseState rep pos)) ) ->
+              ParserT rep pos m a -> ParserT rep pos n b
 mapParserT = over ParserT <<< mapExceptT <<< mapStateT
 
-instance lazyParserT :: Lazy (ParserT s m a) where
-  defer f = ParserT (ExceptT (defer (runExceptT <<< unwrap <<< f)))
+instance lazyParserT :: Lazy (ParserT rep pos m a) where
+  defer f = ParserT <<< ExceptT <<< defer $ runExceptT <<< un ParserT <<< f
 
-instance semigroupParserT :: (Monad m, Semigroup a) => Semigroup (ParserT s m a) where
+instance semigroupParserT :: (Monad m, Semigroup a) => Semigroup (ParserT rep pos m a) where
   append = lift2 (<>)
 
-instance monoidParserT :: (Monad m, Monoid a) => Monoid (ParserT s m a) where
+instance monoidParserT :: (Monad m, Monoid a) => Monoid (ParserT rep pos m a) where
   mempty = pure mempty
 
-derive newtype instance functorParserT :: Functor m => Functor (ParserT s m)
-derive newtype instance applyParserT :: Monad m => Apply (ParserT s m)
-derive newtype instance applicativeParserT :: Monad m => Applicative (ParserT s m)
-derive newtype instance bindParserT :: Monad m => Bind (ParserT s m)
-derive newtype instance monadParserT :: Monad m => Monad (ParserT s m)
-derive newtype instance monadRecParserT :: MonadRec m => MonadRec (ParserT s m)
-derive newtype instance monadStateParserT :: Monad m => MonadState (ParseState s) (ParserT s m)
-derive newtype instance monadThrowParserT :: Monad m => MonadThrow ParseError (ParserT s m)
-derive newtype instance monadErrorParserT :: Monad m => MonadError ParseError (ParserT s m)
+derive newtype instance functorParserT :: Functor m => Functor (ParserT rep pos m)
+derive newtype instance applyParserT :: Monad m => Apply (ParserT rep pos m)
+derive newtype instance applicativeParserT :: Monad m => Applicative (ParserT rep pos m)
+derive newtype instance bindParserT :: Monad m => Bind (ParserT rep pos m)
+derive newtype instance monadParserT :: Monad m => Monad (ParserT rep pos m)
+derive newtype instance monadRecParserT :: MonadRec m => MonadRec (ParserT rep pos m)
+derive newtype instance monadStateParserT :: Monad m => MonadState (ParseState rep pos) (ParserT rep pos m)
+derive newtype instance monadThrowParserT :: Monad m => MonadThrow (ParseError pos) (ParserT rep pos m)
+derive newtype instance monadErrorParserT :: Monad m => MonadError (ParseError pos) (ParserT rep pos m)
 
-instance altParserT :: Monad m => Alt (ParserT s m) where
-  alt p1 p2 = (ParserT <<< ExceptT <<< StateT) \(s@(ParseState i p _)) -> do
-    Tuple e s'@(ParseState i' p' c') <- runStateT (runExceptT (unwrap p1)) (ParseState i p false)
+instance altParserT :: Monad m => Alt (ParserT rep pos m) where
+  alt p1 p2 = ParserT <<< ExceptT <<< StateT $ \s -> do
+    let clean = over ParseState _ { consumed = false } s
+    result@(Tuple e s') <- runStateT (runExceptT <<< un ParserT $ p1) clean
     case e of
       Left err
-        | not c' -> runStateT (runExceptT (unwrap p2)) s
-      _ -> pure (Tuple e s')
+        | false <- through ParseState _.consumed s' -> runStateT (runExceptT <<< un ParserT $ p2) s
+      _                                             -> pure result
 
-instance plusParserT :: Monad m => Plus (ParserT s m) where
+instance plusParserT :: Monad m => Plus (ParserT rep pos m) where
   empty = fail "No alternative"
 
-instance alternativeParserT :: Monad m => Alternative (ParserT s m)
+instance alternativeParserT :: Monad m => Alternative (ParserT rep pos m)
 
-instance monadZeroParserT :: Monad m => MonadZero (ParserT s m)
+instance monadZeroParserT :: Monad m => MonadZero (ParserT rep pos m)
 
-instance monadPlusParserT :: Monad m => MonadPlus (ParserT s m)
+instance monadPlusParserT :: Monad m => MonadPlus (ParserT rep pos m)
 
-instance monadTransParserT :: MonadTrans (ParserT s) where
+instance monadTransParserT :: MonadTrans (ParserT s pos) where
   lift = ParserT <<< lift <<< lift
 
 -- | Set the consumed flag.
-consume :: forall s m. Monad m => ParserT s m Unit
-consume = modify_ \(ParseState input pos _) ->
-  ParseState input pos true
+consume :: forall rep pos m. Monad m => ParserT rep pos m Unit
+consume = modify_ $ over ParseState _{ consumed = true }
 
 -- | Returns the current position in the stream.
-position :: forall s m. Monad m => ParserT s m Position
-position = gets \(ParseState _ pos _) -> pos
+position :: forall rep pos m. Monad m => ParserT rep pos m pos
+position = gets $ through ParseState _.pos
 
 -- | Fail with a message.
-fail :: forall m s a. Monad m => String -> ParserT s m a
-fail message = failWithPosition message =<< position
+fail :: forall rep pos m a. Monad m => String -> ParserT rep pos m a
+fail msg = position >>= failWithPosition msg
 
 -- | Fail with a message and a position.
-failWithPosition :: forall m s a. Monad m => String -> Position -> ParserT s m a
-failWithPosition message pos = throwError (ParseError message pos)
+failWithPosition :: forall rep pos m a. Monad m => String -> pos -> ParserT rep pos m a
+failWithPosition msg pos = throwError <<< ParseError $ { msg, pos }
+

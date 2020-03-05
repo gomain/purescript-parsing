@@ -123,6 +123,12 @@ let upstream =
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+      { data-default =
+          { dependencies = [ "maybe", "psci-support", "lists", "record" ]
+          , repo = "https://github.com/thought2/purescript-data-default.git"
+          , version = "v0.3.2"
+          }
+      }
 
-in  upstream // overrides // additions
+in  upstream ⫽ overrides ⫽ additions
