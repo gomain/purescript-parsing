@@ -1,7 +1,9 @@
-module Sequence.Parsing.Parser.ParseError (
+module Sequence.Parsing.Parser.Data (
   ParseError(..),
   parseErrorMessage,
-  parseErrorPosition ) where
+  parseErrorPosition,
+  ParseState(..),
+  parseStateRest ) where
 
 import Data.Newtype (class Newtype)
 import Prelude (class Show, show, (<<<), (<>))
@@ -23,3 +25,14 @@ instance showParseError :: Show pos => Show (ParseError pos) where
 
 --derive instance eqParseError :: Eq ParseError
 --derive instance ordParseError :: Ord ParseError
+
+-- | Contains the remaining input and current position.
+newtype ParseState rep pos = ParseState {
+                               rest :: rep,
+                               pos :: pos,
+                               consumed :: Boolean }
+
+derive instance parseStateNewtype :: Newtype (ParseState rep pos) _
+
+parseStateRest :: forall rep pos. ParseState rep pos -> rep
+parseStateRest = through ParseState _.rest

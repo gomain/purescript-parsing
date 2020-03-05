@@ -34,8 +34,8 @@ import Data.List (List(..), (:), many, some, singleton)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (over, un)
 import Data.Tuple (Tuple(..))
-import Sequence.Parsing.Parser (ParseState(..), ParserT(..), fail)
-import Sequence.Parsing.Parser.ParseError (ParseError(..))
+import Sequence.Parsing.Parser (ParserT(..), fail)
+import Sequence.Parsing.Parser.Data (ParseError(..), ParseState(..))
 import Utils.Data.Newtype (through)
 
 -- | Provide an error message in the case of failure.

@@ -11,8 +11,9 @@ import Control.Monad.State (gets, put)
 import Control.MonadPlus (guard)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
-import Sequence.Parsing.Parser (ParseState(..), ParserT, consume, fail, parseStateRest)
+import Sequence.Parsing.Parser (ParserT, consume, fail)
 import Sequence.Parsing.Parser.Class (class Drop, class Parsable, class Update, drop, null, uncons, update)
+import Sequence.Parsing.Parser.Data (ParseState(..), parseStateRest)
 
 any :: forall seq elem rep pos m.
        Parsable seq elem rep pos => Monad m =>

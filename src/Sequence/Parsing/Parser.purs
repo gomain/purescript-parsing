@@ -1,7 +1,5 @@
 module Sequence.Parsing.Parser
-  ( ParseState(..)
-  , parseStateRest 
-  , ParserT(..)
+  ( ParserT(..)
   , Parser
   , runParser
   , runParserT
@@ -30,20 +28,10 @@ import Data.Identity (Identity(..))
 import Data.Newtype (class Newtype, over, un)
 import Data.Tuple (Tuple(..))
 import Sequence.Parsing.Parser.Class (class Parsable, rep)
-import Sequence.Parsing.Parser.ParseError (ParseError(..))
+import Sequence.Parsing.Parser.Data (ParseError(..), ParseState(..))
 import Utils.Data.Newtype (through)
 
 
--- | Contains the remaining input and current position.
-newtype ParseState rep pos = ParseState {
-                               rest :: rep,
-                               pos :: pos,
-                               consumed :: Boolean }
-
-derive instance parseStateNewtype :: Newtype (ParseState rep pos) _
-
-parseStateRest :: forall rep pos. ParseState rep pos -> rep
-parseStateRest = through ParseState _.rest
 
 -- | The Parser monad transformer.
 -- |
