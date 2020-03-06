@@ -8,6 +8,7 @@ git/.*
 /generated-docs/
 /node_modules/
 /output/
+/.psci_modules/
 /.purs-repl
 /.spago
 
