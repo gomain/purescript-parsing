@@ -39,14 +39,14 @@ import Sequence.Parsing.Parser.Data (ParseError(..), ParseState(..))
 import Utils.Data.Newtype (through)
 
 -- | Provide an error message in the case of failure.
-withErrorMessage :: forall rep pos m a. Monad m =>
-                    ParserT rep pos m a -> String -> ParserT rep pos m a
+withErrorMessage :: forall seq rep pos m a. Monad m =>
+                    ParserT seq rep pos m a -> String -> ParserT seq rep pos m a
 withErrorMessage p msg = p <|> fail msg
 
 infixl 3 withErrorMessage as <?>
 
 -- | Flipped `(<?>)`.
-asErrorMessage :: forall rep pos m a. Monad m => String -> ParserT rep pos m a -> ParserT rep pos m a
+asErrorMessage :: forall seq rep pos m a. Monad m => String -> ParserT seq rep pos m a -> ParserT seq rep pos m a
 asErrorMessage = flip (<?>)
 
 infixl 3 asErrorMessage as <??>
@@ -58,27 +58,27 @@ infixl 3 asErrorMessage as <??>
 -- | ```purescript
 -- | parens = between (string "(") (string ")")
 -- | ```
-between :: forall rep pos m a open close.
+between :: forall seq rep pos m a open close.
            Monad m =>
-           ParserT rep pos m open -> ParserT rep pos m close -> ParserT rep pos m a ->
-           ParserT rep pos m a
+           ParserT seq rep pos m open -> ParserT seq rep pos m close -> ParserT seq rep pos m a ->
+           ParserT seq rep pos m a
 between open close p = open *> p <* close
 
 -- | Provide a default result in the case where a parser fails without consuming input.
-option :: forall rep pos m a. Monad m => a -> ParserT rep pos m a -> ParserT rep pos m a
+option :: forall seq rep pos m a. Monad m => a -> ParserT seq rep pos m a -> ParserT seq rep pos m a
 option a p = p <|> pure a
 
 -- | Optionally parse something, failing quietly.
-optional :: forall rep pos m a. Monad m => ParserT rep pos m a -> ParserT rep pos m Unit
+optional :: forall seq rep pos m a. Monad m => ParserT seq rep pos m a -> ParserT seq rep pos m Unit
 optional p = void p <|> pure unit
 
 -- | pure `Nothing` in the case where a parser fails without consuming input.
-optionMaybe :: forall rep pos m a. Monad m => ParserT rep pos m a -> ParserT rep pos m (Maybe a)
+optionMaybe :: forall seq rep pos m a. Monad m => ParserT seq rep pos m a -> ParserT seq rep pos m (Maybe a)
 optionMaybe p = option Nothing (Just <$> p)
 
 -- | In case of failure, reset the sequence to the unconsumed state.
-try :: forall rep pos m a. Monad m =>
-       ParserT rep pos  m a -> ParserT rep pos m a
+try :: forall seq rep pos m a. Monad m =>
+       ParserT seq rep pos  m a -> ParserT seq rep pos m a
 try p = ParserT <<< ExceptT <<< StateT $ \s  -> do
   result@(Tuple e s') <- runStateT (runExceptT (un ParserT p)) s
   case e of
@@ -87,8 +87,8 @@ try p = ParserT <<< ExceptT <<< StateT $ \s  -> do
     _      -> pure result
 
 -- | Like `try`, but will reannotate the error location to the `try` point.
-tryRethrow :: forall rep pos m a. Monad m =>
-              ParserT rep pos m a -> ParserT rep pos m a
+tryRethrow :: forall seq rep pos m a. Monad m =>
+              ParserT seq rep pos m a -> ParserT seq rep pos m a
 tryRethrow p = ParserT <<< ExceptT <<< StateT $ \s -> do
   result@(Tuple e s') <- runStateT (runExceptT (un ParserT p)) s
   case e of
@@ -99,7 +99,7 @@ tryRethrow p = ParserT <<< ExceptT <<< StateT $ \s -> do
     _ -> pure result
 
 -- | Parse a phrase, without modifying the consumed state or stream position.
-lookAhead :: forall rep pos m a. Monad m => ParserT rep pos m a -> ParserT rep pos m a
+lookAhead :: forall seq rep pos m a. Monad m => ParserT seq rep pos m a -> ParserT seq rep pos m a
 lookAhead p = (ParserT <<< ExceptT <<< StateT) \s -> do
   Tuple e _ <- runStateT (runExceptT (un ParserT p)) s
   pure (Tuple e s)
@@ -111,26 +111,26 @@ lookAhead p = (ParserT <<< ExceptT <<< StateT) \s -> do
 -- | ```purescript
 -- | digit `sepBy` string ","
 -- | ```
-sepBy :: forall rep pos m a sep. Monad m =>
-         ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+sepBy :: forall seq rep pos m a sep. Monad m =>
+         ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 sepBy p sep = sepBy1 p sep <|> pure Nil
 
 -- | Parse phrases delimited by a separator, requiring at least one match.
-sepBy1 :: forall rep pos m a sep. Monad m =>
-          ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+sepBy1 :: forall seq rep pos m a sep. Monad m =>
+          ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 sepBy1 p sep = do
   a <- p
   as <- many $ sep *> p
   pure (a : as)
 
 -- | Parse phrases delimited and optionally terminated by a separator.
-sepEndBy :: forall rep pos m a sep. Monad m =>
-            ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+sepEndBy :: forall seq rep pos m a sep. Monad m =>
+            ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 sepEndBy p sep = sepEndBy1 p sep <|> pure Nil
 
 -- | Parse phrases delimited and optionally terminated by a separator, requiring at least one match.
-sepEndBy1 :: forall rep pos m a sep. Monad m =>
-             ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+sepEndBy1 :: forall seq rep pos m a sep. Monad m =>
+             ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 sepEndBy1 p sep = do
   a <- p
   let many = do _ <- sep
@@ -139,13 +139,13 @@ sepEndBy1 p sep = do
   many <|> pure (singleton a)
 
 -- | Parse phrases delimited and terminated by a separator, requiring at least one match.
-endBy1 :: forall rep pos m a sep. Monad m =>
-          ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+endBy1 :: forall seq rep pos m a sep. Monad m =>
+          ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 endBy1 p sep = some $ p <* sep
 
 -- | Parse phrases delimited and terminated by a separator.
-endBy :: forall rep pos m a sep. Monad m =>
-         ParserT rep pos m a -> ParserT rep pos m sep -> ParserT rep pos m (List a)
+endBy :: forall seq rep pos m a sep. Monad m =>
+         ParserT seq rep pos m a -> ParserT seq rep pos m sep -> ParserT seq rep pos m (List a)
 endBy p sep = many $ p <* sep
 
 -- | Parse phrases delimited by a right-associative operator.
@@ -155,67 +155,67 @@ endBy p sep = many $ p <* sep
 -- | ```purescript
 -- | chainr digit (string "+" *> add) 0
 -- | ```
-chainr :: forall rep pos m a. Monad m =>
-                            ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> a -> ParserT rep pos m a
+chainr :: forall seq rep pos m a. Monad m =>
+                            ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> a -> ParserT seq rep pos m a
 chainr p f a = chainr1 p f <|> pure a
 
 -- | Parse phrases delimited by a left-associative operator.
-chainl :: forall rep pos m a. Monad m =>
-          ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> a -> ParserT rep pos m a
+chainl :: forall seq rep pos m a. Monad m =>
+          ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> a -> ParserT seq rep pos m a
 chainl p f a = chainl1 p f <|> pure a
 
 -- | Parse phrases delimited by a left-associative operator, requiring at least one match.
-chainl1 :: forall rep pos m a. Monad m =>
-           ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> ParserT rep pos m a
+chainl1 :: forall seq rep pos m a. Monad m =>
+           ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> ParserT seq rep pos m a
 chainl1 p f = do a <- p
                  chainl1' p f a
 
-chainl1' :: forall rep pos m a. Monad m =>
-            ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> a -> ParserT rep pos m a
+chainl1' :: forall seq rep pos m a. Monad m =>
+            ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> a -> ParserT seq rep pos m a
 chainl1' p f a = do f' <- f
                     a' <- p
                     chainl1' p f (f' a a')
                  <|> pure a
 
 -- | Parse phrases delimited by a right-associative operator, requiring at least one match.
-chainr1 :: forall rep pos m a. Monad m =>
-           ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> ParserT rep pos m a
+chainr1 :: forall seq rep pos m a. Monad m =>
+           ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> ParserT seq rep pos m a
 chainr1 p f = do a <- p
                  chainr1' p f a
 
-chainr1' :: forall rep pos m a. Monad m =>
-            ParserT rep pos m a -> ParserT rep pos m (a -> a -> a) -> a -> ParserT rep pos m a
+chainr1' :: forall seq rep pos m a. Monad m =>
+            ParserT seq rep pos m a -> ParserT seq rep pos m (a -> a -> a) -> a -> ParserT seq rep pos m a
 chainr1' p f a = do f' <- f
                     a' <- chainr1 p f
                     pure $ f' a a'
                  <|> pure a
 
 -- | Parse one of a set of alternatives.
-choice :: forall f pos m rep a. Foldable f => Monad m =>
-          f (ParserT rep pos m a) -> ParserT rep pos m a
+choice :: forall f seq rep pos m a. Foldable f => Monad m =>
+          f (ParserT seq rep pos m a) -> ParserT seq rep pos m a
 choice = foldl (<|>) empty
 
 -- | Skip many instances of a phrase.
-skipMany :: forall pos rep a m. Monad m =>
-            ParserT rep pos m a -> ParserT rep pos m Unit
+skipMany :: forall seq rep pos m a. Monad m =>
+            ParserT seq rep pos m a -> ParserT seq rep pos m Unit
 skipMany p = skipMany1 p <|> pure unit
 
 -- | Skip at least one instance of a phrase.
-skipMany1 :: forall pos rep a m. Monad m =>
-             ParserT rep pos m a -> ParserT rep pos m Unit
+skipMany1 :: forall seq rep pos m a. Monad m =>
+             ParserT seq rep pos m a -> ParserT seq rep pos m Unit
 skipMany1 p = do
   x <- p
   xs <- skipMany p
   pure unit
 
 -- | Fail if the specified parser matches.
-notFollowedBy :: forall pos rep m a. Monad m =>
-                 ParserT rep pos m a -> ParserT rep pos m Unit
+notFollowedBy :: forall seq rep pos m a. Monad m =>
+                 ParserT seq rep pos m a -> ParserT seq rep pos m Unit
 notFollowedBy p = try $ (try p *> fail "Negated parser succeeded") <|> pure unit
 
 -- | Parse several phrases until the specified terminator matches.
-manyTill :: forall rep pos m a end. Monad m =>
-            ParserT rep pos m a -> ParserT rep pos m end -> ParserT rep pos m (List a)
+manyTill :: forall seq rep pos m a end. Monad m =>
+            ParserT seq rep pos m a -> ParserT seq rep pos m end -> ParserT seq rep pos m (List a)
 manyTill p end = scan
   where
     scan = (end $> Nil)
@@ -224,8 +224,8 @@ manyTill p end = scan
                   pure (x:xs)
 
 -- | Parse several phrases until the specified terminator matches, requiring at least one match.
-many1Till :: forall rep pos m a end. Monad m =>
-             ParserT rep pos m a -> ParserT rep pos m end -> ParserT rep pos m (List a)
+many1Till :: forall seq rep pos m a end. Monad m =>
+             ParserT seq rep pos m a -> ParserT seq rep pos m end -> ParserT seq rep pos m (List a)
 many1Till p end = do
   x <- p
   xs <- manyTill p end

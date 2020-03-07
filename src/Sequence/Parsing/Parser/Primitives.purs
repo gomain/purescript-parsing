@@ -12,12 +12,12 @@ import Control.MonadPlus (guard)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
 import Sequence.Parsing.Parser (ParserT, consume, fail)
-import Sequence.Parsing.Parser.Class (class Drop, class Parsable, class Update, drop, null, uncons, update)
+import Sequence.Parsing.Parser.Class (class Drop, class Parsable, class Update, drop, null, rep, uncons, update)
 import Sequence.Parsing.Parser.Data (ParseState(..), parseStateRest)
 
 any :: forall seq elem rep pos m.
        Parsable seq elem rep pos => Monad m =>
-       ParserT rep pos m elem
+       ParserT seq rep pos m elem
 any = do
   { rest, pos } <- gets $ un ParseState
   case uncons rest of
@@ -28,26 +28,26 @@ any = do
 
 when :: forall seq elem rep pos m.
         Parsable seq elem rep pos => Monad m =>
-        (elem -> Boolean) -> ParserT rep pos m elem
+        (elem -> Boolean) -> ParserT seq rep pos m elem
 when pred = do elem <- any
                guard $ pred elem
                pure elem
 
 match :: forall seq elem rep pos m.
          Parsable seq elem rep pos => Monad m =>
-         elem -> ParserT rep pos m elem
+         elem -> ParserT seq rep pos m elem
 match = take
 
 string :: forall seq elem rep pos m.
           Parsable seq elem rep pos => Monad m =>
-          seq -> ParserT rep pos m seq
-string seq = if null seq
+          seq -> ParserT seq rep pos m seq
+string seq = if null <<< rep $ seq
              then consume *> pure seq
              else take seq
 
-take :: forall rep pos m a.
+take :: forall seq rep pos m a.
         Drop a rep => Update a pos => Monad m =>
-        a -> ParserT rep pos m a
+        a -> ParserT seq rep pos m a
 take a = do { rest, pos } <- gets $ un ParseState
             case drop a rest of
               Nothing   -> fail "Parse failed"
@@ -57,7 +57,7 @@ take a = do { rest, pos } <- gets $ un ParseState
 
 end :: forall seq elem rep pos m.
        Parsable seq elem rep pos => Monad m =>
-       ParserT rep pos m Unit
+       ParserT seq rep pos m Unit
 end = do ended <- gets $ null <<< parseStateRest
          guard ended
          pure unit

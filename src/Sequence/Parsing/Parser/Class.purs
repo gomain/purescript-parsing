@@ -1,5 +1,5 @@
 module Sequence.Parsing.Parser.Class (
-  class SequenceRep,
+  class Represent,
   rep,
   null,
   class Sequence,
@@ -13,25 +13,24 @@ module Sequence.Parsing.Parser.Class (
 import Data.Default (class Default)
 import Data.Maybe (Maybe)
 
-class SequenceRep seq rep | seq -> rep, rep -> seq where
-  rep :: seq -> rep
+class Represent tee tive | tee -> tive where
+  rep :: tee -> tive
 
 class Sequence seq elem | seq -> elem where
   uncons :: seq -> Maybe { head :: elem, tail :: seq }
   null :: seq -> Boolean
   
-class Drop with rep where
-  drop :: with -> rep -> Maybe rep
+class Drop with dropable where
+  drop :: with -> dropable -> Maybe dropable
 
-class Update with pos where
-  update :: with -> pos -> pos
+class Update with updatable where
+  update :: with -> updatable -> updatable
   
-class (SequenceRep seq rep,
-       Sequence seq elem,
+class (Represent seq rep,
        Sequence rep elem,
        Drop seq rep,
        Drop elem rep,
        Default pos,
        Update seq pos,
        Update elem pos) <=
-       Parsable seq elem rep pos | seq -> elem rep pos, rep -> seq
+       Parsable seq elem rep pos | seq -> elem rep pos
