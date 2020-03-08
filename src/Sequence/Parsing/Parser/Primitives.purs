@@ -12,7 +12,7 @@ import Control.MonadPlus (guard)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
 import Sequence.Parsing.Parser (ParserT, consume, fail)
-import Sequence.Parsing.Parser.Class (class Drop, class Parsable, class Update, drop, null, rep, uncons, update)
+import Sequence.Parsing.Parser.Class (class StripPrefix, class Parsable, class Update, stripPrefix, null, rep, uncons, update)
 import Sequence.Parsing.Parser.Data (ParseState(..), parseStateRest)
 
 any :: forall seq elem rep pos m.
@@ -46,10 +46,10 @@ string seq = if null <<< rep $ seq
              else take seq
 
 take :: forall seq rep pos m a.
-        Drop a rep => Update a pos => Monad m =>
+        StripPrefix a rep => Update a pos => Monad m =>
         a -> ParserT seq rep pos m a
 take a = do { rest, pos } <- gets $ un ParseState
-            case drop a rest of
+            case stripPrefix a rest of
               Nothing   -> fail "Parse failed"
               Just rest' -> do
                 put $ ParseState { rest: rest', pos: update a pos, consumed: true }
