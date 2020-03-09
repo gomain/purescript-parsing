@@ -2,7 +2,7 @@ module Sequence.Parsing.Parser.Class (
   class Represent,
   rep,
   IndexedSequenceRep,
-  class Sequence,
+  class Uncons,
   uncons,
   null,
   class StripPrefix,
@@ -45,19 +45,19 @@ instance representArray :: Represent (Array a) (IndexedSequenceRep (Array a)) wh
 instance representList :: Represent (List a) (List a) where
   rep = identity
 
-class Sequence seq elem | seq -> elem where
+class Uncons seq elem | seq -> elem where
   uncons :: seq -> Maybe { head :: elem, tail :: seq }
 
-null :: forall seq elem. Sequence seq elem => seq -> Boolean
+null :: forall seq elem. Uncons seq elem => seq -> Boolean
 null = isNothing <<< uncons
 
-instance sequenceIndexedSequenceRepArray :: Sequence (IndexedSequenceRep (Array a)) a where
+instance sequenceIndexedSequenceRepArray :: Uncons (IndexedSequenceRep (Array a)) a where
   uncons rep = do
     let { seq, index } = un IndexedSequenceRep rep
     head <- seq `A.index` index
     pure { head, tail: IndexedSequenceRep { seq, index: index + 1 } }
 
-instance sequenceList :: Sequence (List a) a where
+instance sequenceList :: Uncons (List a) a where
   uncons = L.uncons
   
 class StripPrefix prefix sequence where
@@ -124,7 +124,7 @@ instance updateAIndex :: Update a Index where
   update _ = over Index (_ + 1)
 
 class (Represent seq rep,
-       Sequence rep elem,
+       Uncons rep elem,
        StripPrefix seq rep,
        StripPrefix elem rep,
        Default pos,
