@@ -9,9 +9,10 @@ import Prelude
 
 import Control.Monad.State (gets, put)
 import Control.MonadPlus (guard)
+import Control.MonadZero (empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
-import Sequence.Parsing.Parser (ParserT, consume, fail)
+import Sequence.Parsing.Parser (ParserT, consume)
 import Sequence.Parsing.Parser.Class (class StripPrefix, class Parsable, class Update, stripPrefix, null, rep, uncons, update)
 import Sequence.Parsing.Parser.Data (ParseState(..), parseStateRest)
 
@@ -21,7 +22,7 @@ any :: forall seq elem rep pos m.
 any = do
   { rest, pos } <- gets $ un ParseState
   case uncons rest of
-    Nothing -> fail "Unexpected end of sequence"
+    Nothing -> empty
     Just { head, tail } -> do
       put $ ParseState { rest: tail, pos: update head pos, consumed: true }
       pure head
@@ -50,7 +51,7 @@ take :: forall seq rep pos m a.
         a -> ParserT seq rep pos m a
 take a = do { rest, pos } <- gets $ un ParseState
             case stripPrefix a rest of
-              Nothing   -> fail "Parse failed"
+              Nothing   -> empty
               Just rest' -> do
                 put $ ParseState { rest: rest', pos: update a pos, consumed: true }
                 pure a
