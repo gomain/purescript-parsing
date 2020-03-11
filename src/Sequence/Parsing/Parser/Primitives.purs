@@ -37,24 +37,24 @@ when pred = do elem <- any
 match :: forall seq elem rep pos m.
          Parsable seq elem rep pos => Monad m =>
          elem -> ParserT seq rep pos m elem
-match = take
+match = match_
 
 string :: forall seq elem rep pos m.
           Parsable seq elem rep pos => Monad m =>
           seq -> ParserT seq rep pos m seq
 string seq = if null <<< rep $ seq
              then consume *> pure seq
-             else take seq
+             else match_ seq
 
-take :: forall seq rep pos m a.
+match_ :: forall seq rep pos m a.
         StripPrefix a rep => Update a pos => Monad m =>
         a -> ParserT seq rep pos m a
-take a = do { rest, pos } <- gets $ un ParseState
-            case stripPrefix a rest of
-              Nothing   -> empty
-              Just rest' -> do
-                put $ ParseState { rest: rest', pos: update a pos, consumed: true }
-                pure a
+match_ a = do { rest, pos } <- gets $ un ParseState
+              case stripPrefix a rest of
+                Nothing   -> empty
+                Just rest' -> do
+                  put $ ParseState { rest: rest', pos: update a pos, consumed: true }
+                  pure a
 
 end :: forall seq elem rep pos m.
        Parsable seq elem rep pos => Monad m =>
