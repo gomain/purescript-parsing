@@ -4,6 +4,9 @@ module Sequence.Parsing.Parser.Class (
   IndexedSequenceRep,
   class Uncons,
   uncons,
+  class Sequence,
+  singleton,
+  cons,
   null,
   class StripPrefix,
   stripPrefix,
@@ -24,7 +27,7 @@ import Data.Maybe (Maybe, isNothing)
 import Data.Newtype (class Newtype, over, un)
 import Data.String.CodePoints (CodePoint)
 import Data.String.CodePoints as CP
-import Prelude (class Eq, bind, discard, flip, identity, mod, pure, ($), (+), (-), (<<<), (==))
+import Prelude (class Eq, bind, discard, flip, identity, mod, pure, top, ($), (+), (-), (<<<), (<>), (==))
 
 class Represent tee tive | tee -> tive where
   rep :: tee -> tive
@@ -48,18 +51,45 @@ instance representList :: Represent (List a) (List a) where
 class Uncons seq elem | seq -> elem where
   uncons :: seq -> Maybe { head :: elem, tail :: seq }
 
+class Uncons seq elem <= Sequence seq elem | seq -> elem where
+  singleton :: elem -> seq
+  cons :: elem -> seq -> seq
+
 null :: forall seq elem. Uncons seq elem => seq -> Boolean
 null = isNothing <<< uncons
 
-instance sequenceIndexedSequenceRepArray :: Uncons (IndexedSequenceRep (Array a)) a where
+instance unconsStringCodePoint :: Uncons String CodePoint where
+  uncons = CP.uncons
+  
+instance sequenceStringCodePoint :: Sequence String CodePoint where
+  singleton = CP.singleton
+  cons c str = CP.singleton c <> str
+
+instance unconsIndexedSequenceRepArray :: Uncons (IndexedSequenceRep (Array a)) a where
   uncons rep = do
     let { seq, index } = un IndexedSequenceRep rep
     head <- seq `A.index` index
     pure { head, tail: IndexedSequenceRep { seq, index: index + 1 } }
 
-instance sequenceList :: Uncons (List a) a where
-  uncons = L.uncons
-  
+instance sequenceIndexedSequenceRepArray :: Sequence (IndexedSequenceRep (Array a)) a where
+  singleton = makeIndexedSequenceRep <<< A.singleton
+  cons elem (IndexedSequenceRep { seq: arr, index }) =
+    makeIndexedSequenceRep <<< A.cons elem <<< A.slice index top $ arr
+
+instance unconsList :: Uncons (List a) a where
+  uncons = L.uncons  
+
+instance sequenceList :: Sequence (List a) a where
+  singleton = L.singleton
+  cons = L.Cons
+
+instance unconsArray :: Uncons (Array a) a where
+  uncons = A.uncons  
+
+instance sequenceArray :: Sequence (Array a) a where
+  singleton = A.singleton
+  cons = A.cons
+
 class StripPrefix prefix sequence where
   stripPrefix :: prefix -> sequence -> Maybe sequence
 
@@ -124,7 +154,7 @@ instance updateAIndex :: Update a Index where
   update _ = over Index (_ + 1)
 
 class (Represent seq rep,
-       Uncons rep elem,
+       Sequence rep elem,
        StripPrefix seq rep,
        StripPrefix elem rep,
        Default pos,
