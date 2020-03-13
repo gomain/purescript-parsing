@@ -1,5 +1,6 @@
 module Sequence.Parsing.Parser.Primitives (
   any,
+  takeN,
   when,
   match,
   string,
@@ -13,7 +14,7 @@ import Control.MonadZero (empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (un)
 import Sequence.Parsing.Parser (ParserT, consume)
-import Sequence.Parsing.Parser.Class (class StripPrefix, class Parsable, class Update, stripPrefix, null, rep, uncons, update)
+import Sequence.Parsing.Parser.Class (class Parsable, class Sequence, class StripPrefix, class Update, cons, null, rep, singleton, stripPrefix, uncons, update)
 import Sequence.Parsing.Parser.Data (ParseState(..), parseStateRest)
 
 any :: forall seq elem rep pos m.
@@ -26,6 +27,13 @@ any = do
     Just { head, tail } -> do
       put $ ParseState { rest: tail, pos: update head pos, consumed: true }
       pure head
+
+takeN :: forall seq elem rep pos m.
+         Parsable seq elem rep pos => Monad m => Sequence seq elem =>
+         Int -> ParserT seq rep pos m seq
+takeN n = go n where
+  go 0 = singleton <$> any
+  go n' = cons <$> any <*> go (n' - 1)
 
 when :: forall seq elem rep pos m.
         Parsable seq elem rep pos => Monad m =>
